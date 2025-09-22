@@ -54,6 +54,10 @@ n_head = 12
 n_embd = 768
 dropout = 0.0 # for pretraining 0 is good, for finetuning try 0.1+
 bias = False # do we use bias inside LayerNorm and Linear layers?
+# auxiliary state head (optional)
+state_head_classes = 0       # e.g., 2 for Golden Mean (A/B). 0 disables the head
+state_loss_weight = 0.0      # weight for auxiliary loss
+state_labels_dat = ''       # optional explicit path to .states.dat (chars like 'A''B'); empty disables
 # adamw optimizer
 learning_rate = 6e-4 # max learning rate
 max_iters = 600000 # total number of training iterations
@@ -118,17 +122,39 @@ def get_batch(split):
     # https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
     if split == 'train':
         data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.uint16, mode='r')
+        states_src = 'train'
     else:
         data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.uint16, mode='r')
+        states_src = 'val'
     ix = torch.randint(len(data) - block_size, (batch_size,))
     x = torch.stack([torch.from_numpy((data[i:i+block_size]).astype(np.int64)) for i in ix])
     y = torch.stack([torch.from_numpy((data[i+1:i+1+block_size]).astype(np.int64)) for i in ix])
+    # optional state targets aligned to pre-emission s_t for each x position
+    s = None
+    if _states_labels_np is not None:
+        # states are a single long sequence; split 90/10 like data
+        n_total = _states_labels_np.shape[0]
+        n_train = int(n_total * 0.9)
+        if states_src == 'train':
+            base = 0
+        else:
+            base = n_train
+        # construct per-sample slice indices identical to x
+        s = torch.stack([
+            torch.from_numpy(_states_labels_np[base + int(i): base + int(i) + block_size]) for i in ix
+        ])
+    # move to device
     if device_type == 'cuda':
         # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
-        x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)
+        x = x.pin_memory().to(device, non_blocking=True)
+        y = y.pin_memory().to(device, non_blocking=True)
+        if s is not None:
+            s = s.pin_memory().to(device, non_blocking=True)
     else:
         x, y = x.to(device), y.to(device)
-    return x, y
+        if s is not None:
+            s = s.to(device)
+    return x, y, s
 
 # init these up here, can override if init_from='resume' (i.e. from a checkpoint)
 iter_num = 0
@@ -143,9 +169,24 @@ if os.path.exists(meta_path):
     meta_vocab_size = meta['vocab_size']
     print(f"found vocab_size = {meta_vocab_size} (inside {meta_path})")
 
+# optional: load ground-truth causal state labels from .states.dat
+_states_labels_np = None
+if state_head_classes and state_loss_weight > 0.0 and state_labels_dat:
+    try:
+        with open(state_labels_dat, 'r') as f:
+            chars = f.read().strip()
+        # map A,B,... to 0,1,... (only A/B used in Golden Mean)
+        mapping = {ch: idx for idx, ch in enumerate(sorted(set(chars)))}
+        _states_labels_np = np.fromiter((mapping[c] for c in chars), dtype=np.int64)
+        print(f"Loaded state labels from {state_labels_dat}: classes={len(mapping)} length={_states_labels_np.shape[0]}")
+    except Exception as e:
+        print(f"WARNING: failed to load state labels from {state_labels_dat}: {e}")
+        _states_labels_np = None
+
 # model init
 model_args = dict(n_layer=n_layer, n_head=n_head, n_embd=n_embd, block_size=block_size,
-                  bias=bias, vocab_size=None, dropout=dropout) # start with model_args from command line
+                  bias=bias, vocab_size=None, dropout=dropout,
+                  state_head_classes=state_head_classes, state_loss_weight=state_loss_weight) # start with model_args from command line
 if init_from == 'scratch':
     # init a new model from scratch
     print("Initializing a new model from scratch")
@@ -163,7 +204,7 @@ elif init_from == 'resume':
     checkpoint_model_args = checkpoint['model_args']
     # force these config attributes to be equal otherwise we can't even resume training
     # the rest of the attributes (e.g. dropout) can stay as desired from command line
-    for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size']:
+    for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size', 'state_head_classes', 'state_loss_weight']:
         model_args[k] = checkpoint_model_args[k]
     # create the model
     gptconf = GPTConfig(**model_args)
@@ -218,12 +259,29 @@ def estimate_loss():
     model.eval()
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
+        lm_sums, lm_count = 0.0, 0
+        st_sums, st_count = 0.0, 0
         for k in range(eval_iters):
-            X, Y = get_batch(split)
+            X, Y, S = get_batch(split)
             with ctx:
-                logits, loss = model(X, Y)
+                if _states_labels_np is not None and state_head_classes:
+                    logits, loss = model(X, Y, state_targets=S)
+                else:
+                    logits, loss = model(X, Y)
             losses[k] = loss.item()
-        out[split] = losses.mean()
+            # capture component losses
+            m = model.module if hasattr(model, 'module') else model
+            if getattr(m, '_last_lm_loss', None) is not None:
+                lm_sums += float(m._last_lm_loss.detach().item())
+                lm_count += 1
+            if getattr(m, '_last_state_loss', None) is not None:
+                st_sums += float(m._last_state_loss.detach().item())
+                st_count += 1
+        out[split] = {
+            'total': float(losses.mean().item()),
+            'lm': (lm_sums / lm_count) if lm_count else None,
+            'state': (st_sums / st_count) if st_count else None,
+        }
     model.train()
     return out
 
@@ -247,7 +305,7 @@ if wandb_log and master_process:
     wandb.init(project=wandb_project, name=wandb_run_name, config=config)
 
 # training loop
-X, Y = get_batch('train') # fetch the very first batch
+X, Y, S = get_batch('train') # fetch the very first batch
 t0 = time.time()
 local_iter_num = 0 # number of iterations in the lifetime of this process
 raw_model = model.module if ddp else model # unwrap DDP container if needed
@@ -262,17 +320,29 @@ while True:
     # evaluate the loss on train/val sets and write checkpoints
     if iter_num % eval_interval == 0 and master_process:
         losses = estimate_loss()
-        print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        print(
+            f"step {iter_num}: "
+            f"train total {losses['train']['total']:.4f}"
+            + (f", lm {losses['train']['lm']:.4f}" if losses['train']['lm'] is not None else '')
+            + (f", state {losses['train']['state']:.4f}" if losses['train']['state'] is not None else '')
+            + f"; val total {losses['val']['total']:.4f}"
+            + (f", lm {losses['val']['lm']:.4f}" if losses['val']['lm'] is not None else '')
+            + (f", state {losses['val']['state']:.4f}" if losses['val']['state'] is not None else '')
+        )
         if wandb_log:
             wandb.log({
                 "iter": iter_num,
-                "train/loss": losses['train'],
-                "val/loss": losses['val'],
+                "train/loss_total": losses['train']['total'],
+                "train/loss_lm": losses['train']['lm'],
+                "train/loss_state": losses['train']['state'],
+                "val/loss_total": losses['val']['total'],
+                "val/loss_lm": losses['val']['lm'],
+                "val/loss_state": losses['val']['state'],
                 "lr": lr,
                 "mfu": running_mfu*100, # convert to percentage
             })
-        if losses['val'] < best_val_loss or always_save_checkpoint:
-            best_val_loss = losses['val']
+        if losses['val']['total'] < best_val_loss or always_save_checkpoint:
+            best_val_loss = losses['val']['total']
             if iter_num > 0:
                 checkpoint = {
                     'model': raw_model.state_dict(),
@@ -297,10 +367,13 @@ while True:
             # looking at the source of that context manager, it just toggles this variable
             model.require_backward_grad_sync = (micro_step == gradient_accumulation_steps - 1)
         with ctx:
-            logits, loss = model(X, Y)
+            if _states_labels_np is not None and state_head_classes:
+                logits, loss = model(X, Y, state_targets=S)
+            else:
+                logits, loss = model(X, Y)
             loss = loss / gradient_accumulation_steps # scale the loss to account for gradient accumulation
         # immediately async prefetch next batch while model is doing the forward pass on the GPU
-        X, Y = get_batch('train')
+        X, Y, S = get_batch('train')
         # backward pass, with gradient scaling if training in fp16
         scaler.scale(loss).backward()
     # clip the gradient
@@ -321,10 +394,22 @@ while True:
         # get loss as float. note: this is a CPU-GPU sync point
         # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
         lossf = loss.item() * gradient_accumulation_steps
+        # component losses for last micro-step (approximate diagnostics)
+        lm_last = getattr(raw_model, '_last_lm_loss', None)
+        st_last = getattr(raw_model, '_last_state_loss', None)
+        lm_last_f = float(lm_last.detach().item()) if lm_last is not None else None
+        st_last_f = float(st_last.detach().item()) if st_last is not None else None
         if local_iter_num >= 5: # let the training loop settle a bit
             mfu = raw_model.estimate_mfu(batch_size * gradient_accumulation_steps, dt)
             running_mfu = mfu if running_mfu == -1.0 else 0.9*running_mfu + 0.1*mfu
-        print(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms, mfu {running_mfu*100:.2f}%")
+        if lm_last_f is not None or st_last_f is not None:
+            extra = (
+                (f", lm {lm_last_f:.4f}" if lm_last_f is not None else '') +
+                (f", state {st_last_f:.4f}" if st_last_f is not None else '')
+            )
+        else:
+            extra = ''
+        print(f"iter {iter_num}: loss {lossf:.4f}{extra}, time {dt*1000:.2f}ms, mfu {running_mfu*100:.2f}%")
     iter_num += 1
     local_iter_num += 1
 

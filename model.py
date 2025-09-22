@@ -114,6 +114,9 @@ class GPTConfig:
     n_embd: int = 768
     dropout: float = 0.0
     bias: bool = True # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    # Optional auxiliary state prediction head
+    state_head_classes: int = 0
+    state_loss_weight: float = 0.0
 
 class GPT(nn.Module):
 
@@ -131,6 +134,8 @@ class GPT(nn.Module):
             ln_f = LayerNorm(config.n_embd, bias=config.bias),
         ))
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+        # optional auxiliary head for state prediction
+        self.state_head = nn.Linear(config.n_embd, config.state_head_classes, bias=True) if config.state_head_classes > 0 else None
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
         # This behavior is deprecated and will be an error in future versions"
@@ -167,7 +172,7 @@ class GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, idx, targets=None):
+    def forward(self, idx, targets=None, state_targets=None):
         device = idx.device
         b, t = idx.size()
         assert t <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
@@ -181,16 +186,32 @@ class GPT(nn.Module):
             x = block(x)
         x = self.transformer.ln_f(x)
 
+        total_loss = None
+        # language modeling head
         if targets is not None:
-            # if we are given some desired targets also calculate the loss
             logits = self.lm_head(x)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            lm_loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            total_loss = lm_loss
         else:
-            # inference-time mini-optimization: only forward the lm_head on the very last position
-            logits = self.lm_head(x[:, [-1], :]) # note: using list [-1] to preserve the time dim
-            loss = None
+            logits = self.lm_head(x[:, [-1], :])
+            lm_loss = None
 
-        return logits, loss
+        # optional state head: predict per-position classes
+        state_loss = None
+        if self.state_head is not None and state_targets is not None:
+            state_logits = self.state_head(x)  # (b, t, C)
+            state_loss = F.cross_entropy(state_logits.view(-1, state_logits.size(-1)), state_targets.view(-1), ignore_index=-1)
+            if total_loss is None:
+                total_loss = 0.0 * state_loss
+            total_loss = total_loss + (self.config.state_loss_weight * state_loss)
+        else:
+            state_logits = None
+
+        # expose for logging if desired
+        self._last_lm_loss = lm_loss
+        self._last_state_loss = state_loss
+
+        return logits, total_loss
 
     def crop_block_size(self, block_size):
         # model surgery to decrease the block size if necessary

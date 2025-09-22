@@ -97,6 +97,41 @@ Not bad for ~3 minutes on a CPU, for a hint of the right character gestalt. If y
 
 Finally, on Apple Silicon Macbooks and with a recent PyTorch version make sure to add `--device=mps` (short for "Metal Performance Shaders"); PyTorch then uses the on-chip GPU that can *significantly* accelerate training (2-3X) and allow you to use larger networks. See [Issue 28](https://github.com/karpathy/nanoGPT/issues/28) for more.
 
+## golden mean (binary) quick start
+
+If you have a binary sequence dataset like `golden_mean.dat` in this repo (e.g., at `notebook_experiments/golden_mean/data/golden_mean/golden_mean.dat`), you can train a tiny character-level GPT on it:
+
+1) Prepare the dataset into `train.bin`/`val.bin` with a simple 0/1 vocabulary:
+
+```
+python data/golden_mean/prepare.py
+```
+
+The script will autodiscover the input from one of:
+- `data/golden_mean/input.txt`
+- `data/golden_mean/golden_mean.dat`
+- `notebook_experiments/golden_mean/data/golden_mean/golden_mean.dat`
+
+2) Train a small model (same size as the Shakespeare char example):
+
+```
+python train.py config/train_golden_mean_char.py
+```
+
+If you're on CPU, you can add (for a faster, smaller run):
+
+```
+python train.py config/train_golden_mean_char.py --device=cpu --compile=False --eval_iters=20 --log_interval=1 --block_size=64 --batch_size=12 --n_layer=4 --n_head=4 --n_embd=128 --max_iters=2000 --lr_decay_iters=2000 --dropout=0.0
+```
+
+3) Sample from the best checkpoint:
+
+```
+python sample.py --out_dir=out-golden-mean-char --start="1" --num_samples=5 --max_new_tokens=200
+```
+
+This prints continuations of the binary sequence according to the learned distribution.
+
 ## reproducing GPT-2
 
 A more serious deep learning professional may be more interested in reproducing GPT-2 results. So here we go - we first tokenize the dataset, in this case the [OpenWebText](https://openwebtext2.readthedocs.io/en/latest/), an open reproduction of OpenAI's (private) WebText:
