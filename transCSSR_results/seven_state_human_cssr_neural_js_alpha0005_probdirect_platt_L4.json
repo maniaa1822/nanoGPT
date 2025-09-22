@@ -1,0 +1,113 @@
+{
+  "num_states": 4,
+  "states": [
+    {
+      "id": 0,
+      "histories": [
+        "0010",
+        "010",
+        "0110",
+        "1010",
+        "110",
+        "1110"
+      ],
+      "distribution_vector": [
+        0.43773895502090454,
+        0.5622610449790955
+      ],
+      "weight": 22,
+      "transitions": {
+        "0": 2,
+        "1": 1
+      }
+    },
+    {
+      "id": 1,
+      "histories": [
+        "0001",
+        "001",
+        "0101",
+        "1001",
+        "101",
+        "1101"
+      ],
+      "distribution_vector": [
+        0.4707401990890503,
+        0.5292598009109497
+      ],
+      "weight": 22,
+      "transitions": {
+        "0": 0,
+        "1": 3
+      }
+    },
+    {
+      "id": 2,
+      "histories": [
+        "000",
+        "0000",
+        "0100",
+        "100",
+        "1000",
+        "1100"
+      ],
+      "distribution_vector": [
+        0.18801969289779663,
+        0.8119803071022034
+      ],
+      "weight": 22,
+      "transitions": {
+        "0": 2,
+        "1": 1
+      }
+    },
+    {
+      "id": 3,
+      "histories": [
+        "0011",
+        "011",
+        "0111",
+        "1011",
+        "111",
+        "1111"
+      ],
+      "distribution_vector": [
+        0.9375257976353168,
+        0.06247420236468315
+      ],
+      "weight": 22,
+      "transitions": {
+        "0": 0,
+        "1": 3
+      }
+    }
+  ],
+  "config": {
+    "data": "/home/matteo/NeuralCSSR/experiments/datasets/seven_state_human/seven_state_human.dat",
+    "backend": "neural",
+    "L_max": 4,
+    "alpha": 0.02,
+    "test_method": "js",
+    "device": "cuda",
+    "pseudo_count_scale": 50.0,
+    "cap_marginal_counts": true,
+    "pseudo_count_mode": "parent_marginal",
+    "context_window_used": 32,
+    "temperature": 1.0,
+    "prob_clip": 1e-06,
+    "mix_empirical": 0.7,
+    "probe_layer": "final",
+    "head_ckpt": null,
+    "model_ckpt": "/home/matteo/NeuralCSSR/nanoGPT/out-seven-state-char/ckpt.pt",
+    "platt_json": null,
+    "platt_params": {
+      "a": 0.9336731106857719,
+      "b": 0.005316489740846706
+    }
+  },
+  "metrics": {
+    "wmse_neural_vs_empirical": 6.35638646432295e-06,
+    "wmse_neural_vs_gt": 7.78338298442367e-06,
+    "wmse_empirical_vs_gt": 9.026472271008658e-07
+  }
+}

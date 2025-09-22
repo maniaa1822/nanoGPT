@@ -1,0 +1,71 @@
+{
+  "num_states": 1,
+  "states": [
+    {
+      "id": 0,
+      "histories": [
+        "000",
+        "0000",
+        "0001",
+        "001",
+        "0010",
+        "0011",
+        "010",
+        "0100",
+        "0101",
+        "011",
+        "0110",
+        "0111",
+        "100",
+        "1000",
+        "1001",
+        "101",
+        "1010",
+        "1011",
+        "110",
+        "1100",
+        "1101",
+        "111",
+        "1110",
+        "1111"
+      ],
+      "distribution_vector": [
+        0.5099868476390839,
+        0.49001315236091614
+      ],
+      "weight": 88,
+      "transitions": {
+        "0": 0,
+        "1": 0
+      }
+    }
+  ],
+  "config": {
+    "data": "/home/matteo/NeuralCSSR/experiments/datasets/seven_state_human/seven_state_human.dat",
+    "backend": "neural",
+    "L_max": 4,
+    "alpha": 0.168,
+    "test_method": "js",
+    "device": "cuda",
+    "pseudo_count_scale": 50.0,
+    "cap_marginal_counts": true,
+    "pseudo_count_mode": "parent_marginal",
+    "context_window_used": 32,
+    "temperature": 1.0,
+    "prob_clip": 1e-06,
+    "mix_empirical": 0.0,
+    "probe_layer": "final",
+    "head_ckpt": null,
+    "model_ckpt": "/home/matteo/NeuralCSSR/nanoGPT/out-seven-state-char/ckpt.pt",
+    "platt_json": null,
+    "platt_params": {
+      "a": 0.9336731106857719,
+      "b": 0.005316489740846706
+    }
+  },
+  "metrics": {
+    "wmse_neural_vs_empirical": 7.062651627025539e-05,
+    "wmse_neural_vs_gt": 7.327699447402239e-05,
+    "wmse_empirical_vs_gt": 9.026472271008658e-07
+  }
+}

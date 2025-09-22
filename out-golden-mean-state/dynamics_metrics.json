@@ -1,0 +1,11 @@
+{
+  "n_states": 2,
+  "k_clusters": 2,
+  "next_state_probe_acc": 1.0,
+  "transition_row_kl": 9.273044227755218,
+  "transition_graph_jaccard": 0.5,
+  "assignment_rows_cluster_to_state": [
+    0,
+    1
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "num_states": 4,
+  "states": [
+    {
+      "id": 0,
+      "histories": [
+        "0010",
+        "010",
+        "0110",
+        "1010",
+        "110",
+        "1110"
+      ],
+      "distribution_vector": [
+        0.436031699180603,
+        0.563968300819397
+      ],
+      "weight": 22,
+      "transitions": {
+        "0": 1,
+        "1": 3
+      }
+    },
+    {
+      "id": 1,
+      "histories": [
+        "000",
+        "0000",
+        "0100",
+        "100",
+        "1000",
+        "1100"
+      ],
+      "distribution_vector": [
+        0.1731259822845459,
+        0.8268740177154541
+      ],
+      "weight": 22,
+      "transitions": {
+        "0": 1,
+        "1": 3
+      }
+    },
+    {
+      "id": 2,
+      "histories": [
+        "0011",
+        "011",
+        "0111",
+        "1011",
+        "111",
+        "1111"
+      ],
+      "distribution_vector": [
+        0.94677310064435,
+        0.05322689935564995
+      ],
+      "weight": 22,
+      "transitions": {
+        "0": 0,
+        "1": 2
+      }
+    },
+    {
+      "id": 3,
+      "histories": [
+        "0001",
+        "001",
+        "0101",
+        "1001",
+        "101",
+        "1101"
+      ],
+      "distribution_vector": [
+        0.47720521688461304,
+        0.522794783115387
+      ],
+      "weight": 22,
+      "transitions": {
+        "0": 0,
+        "1": 2
+      }
+    }
+  ],
+  "config": {
+    "data": "/home/matteo/NeuralCSSR/experiments/datasets/seven_state_human/seven_state_human.dat",
+    "backend": "neural",
+    "L_max": 4,
+    "alpha": 0.05,
+    "test_method": "js",
+    "device": "cuda",
+    "pseudo_count_scale": 50.0,
+    "cap_marginal_counts": true,
+    "pseudo_count_mode": "parent_marginal",
+    "context_window_used": 32,
+    "temperature": 1.0,
+    "prob_clip": 1e-06,
+    "mix_empirical": 0.0,
+    "probe_layer": "final",
+    "head_ckpt": null,
+    "model_ckpt": "/home/matteo/NeuralCSSR/nanoGPT/out-seven-state-char/ckpt.pt",
+    "platt_json": null
+  },
+  "metrics": {
+    "wmse_neural_vs_empirical": 0.00014387823600006832,
+    "wmse_neural_vs_gt": 0.00014359491161727422,
+    "wmse_empirical_vs_gt": 9.026472271008658e-07
+  }
+}

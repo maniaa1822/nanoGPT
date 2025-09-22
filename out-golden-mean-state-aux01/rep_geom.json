@@ -1,0 +1,34 @@
+{
+  "results": [
+    {
+      "layer": "0",
+      "n_samples": 71999,
+      "emb_dim": 16,
+      "silhouette": 0.2445993721485138,
+      "inter_centroid_dist": 6.143463134765625,
+      "intra_avg_std": 0.7064194679260254,
+      "inter_over_intra": 8.69662206904093,
+      "participation_ratio": 1.13193317466638
+    },
+    {
+      "layer": "1",
+      "n_samples": 71999,
+      "emb_dim": 16,
+      "silhouette": 0.23337997496128082,
+      "inter_centroid_dist": 7.438091278076172,
+      "intra_avg_std": 0.8878265619277954,
+      "inter_over_intra": 8.377865223952481,
+      "participation_ratio": 1.1126533379875114
+    },
+    {
+      "layer": "final",
+      "n_samples": 71999,
+      "emb_dim": 16,
+      "silhouette": 0.20771117508411407,
+      "inter_centroid_dist": 3.666956663131714,
+      "intra_avg_std": 0.47808462381362915,
+      "inter_over_intra": 7.670099560786538,
+      "participation_ratio": 1.084948948141949
+    }
+  ]
+}
