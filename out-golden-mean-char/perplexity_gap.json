@@ -1,8 +1,0 @@
-{
-  "vocab_size": 2,
-  "n_val_positions_head": 7999,
-  "n_val_positions_full_ctx": 800,
-  "avg_nll_head_nats": 0.04913999259673084,
-  "avg_nll_fullctx_nats": 0.4566520474782919,
-  "gap_bits": -0.5879156206800993
-}
