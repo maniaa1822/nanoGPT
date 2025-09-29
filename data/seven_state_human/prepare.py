@@ -96,6 +96,7 @@ def find_input_path() -> str:
     here = os.path.dirname(__file__)
     repo_root = os.path.abspath(os.path.join(here, "../../.."))
     candidates = [
+        os.path.join(repo_root, "experiments", "datasets", "seven_state_human", "seven_state_human.dat"),
         os.path.join(here, "input.txt"),
         os.path.join(here, "seven_state_human.dat"),
         os.path.join(repo_root, "notebook_experiments", "seven_state_human", "seven_state_human.dat"),
@@ -105,10 +106,11 @@ def find_input_path() -> str:
         if os.path.exists(path):
             return path
     raise FileNotFoundError(
-        "No input file found. Place your sequence into data/seven_state_human/input.txt or "
-        "data/seven_state_human/seven_state_human.dat, or ensure "
-        "notebook_experiments/seven_state_human/seven_state_human.dat "
-        "(or data/fsm/seven_state_human/seven_state_human.dat) exists."
+        "No input file found. Expected one of: "
+        "experiments/datasets/seven_state_human/seven_state_human.dat, "
+        "data/seven_state_human/input.txt, data/seven_state_human/seven_state_human.dat, "
+        "notebook_experiments/seven_state_human/seven_state_human.dat, or "
+        "data/fsm/seven_state_human/seven_state_human.dat."
     )
 
 

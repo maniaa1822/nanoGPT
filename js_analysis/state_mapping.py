@@ -2,7 +2,13 @@
 Ground truth state mapping functions for different machine presets.
 
 This module provides functions to map histories to their ground truth causal states
-for supported machine types (seven_state_human, golden_mean, even_process).
+for supported machine types:
+- seven_state_human: New corrected emission probabilities from Figure 3
+- sevestateold: Legacy emission probabilities (preserved for compatibility)
+- golden_mean, even_process: Other supported machines
+
+Note: Both seven_state_human and sevestateold use identical transition structures
+but have different emission probabilities.
 """
 
 import numpy as np
@@ -31,25 +37,25 @@ def get_seven_state_gt_state(history: np.ndarray) -> Optional[str]:
 
     # Check for longest patterns first (4 characters, binary)
     if len(history) >= 4:
-        if history_str.endswith('1110'):
+        if history_str.endswith('0001'):  # AAAB pattern
             return 'aaab'
-        elif history_str.endswith('0110'):
+        elif history_str.endswith('1001'):  # BAAB pattern
             return 'baab'
 
     # Check for 3-character patterns (binary)
     if len(history) >= 3:
-        if history_str.endswith('010'):
+        if history_str.endswith('101'):  # BAB pattern
             return 'bab'
-        elif history_str.endswith('011'):
+        elif history_str.endswith('100'):  # BAA pattern
             return 'baa'
-        elif history_str.endswith('111') and not history_str.endswith('1110'):
+        elif history_str.endswith('000') and not history_str.endswith('0001'):  # AAA pattern (but not AAAB)
             return 'aaa'
 
     # Check for 2-character patterns (binary)
     if len(history) >= 2:
-        if history_str.endswith('00'):
+        if history_str.endswith('11'):  # BB pattern
             return 'bb'
-        elif history_str.endswith('01') and not (len(history) >= 3 and (history_str.endswith('010') or history_str.endswith('011'))):
+        elif history_str.endswith('10') and not (len(history) >= 3 and (history_str.endswith('101') or history_str.endswith('100'))):  # BA pattern (but not longer patterns)
             return 'ba'
 
     # Cannot determine state for shorter histories
@@ -85,7 +91,7 @@ def get_even_process_gt_state(history: np.ndarray) -> str:
 
 def get_gt_state(history: np.ndarray, preset: str) -> Optional[str]:
     """Generic function to get ground truth state for a given preset."""
-    if preset in ['seven_state_human', 'seven_state_human_large']:
+    if preset in ['seven_state_human', 'seven_state_human_100k', 'seven_state_human_large', 'seven_state_human_char_large', 'sevestateold']:
         return get_seven_state_gt_state(history)
     elif preset == 'golden_mean':
         return get_golden_mean_gt_state(history)
@@ -97,15 +103,15 @@ def get_gt_state(history: np.ndarray, preset: str) -> Optional[str]:
 
 def get_all_state_suffixes(preset: str = 'seven_state_human') -> Dict[str, List[str]]:
     """Get all possible suffix patterns that define each state."""
-    if preset in ['seven_state_human', 'seven_state_human_large']:
+    if preset in ['seven_state_human', 'seven_state_human_100k', 'seven_state_human_large', 'seven_state_human_char_large', 'sevestateold']:
         return {
-            'bb': ['00'],        # BB state: ends with 00
-            'aaa': ['111'],      # AAA state: ends with 111
-            'aaab': ['1110'],    # AAAB state: ends with 1110
-            'ba': ['01'],        # BA state: ends with 01
-            'bab': ['010'],      # BAB state: ends with 010
-            'baab': ['0110'],    # BAAB state: ends with 0110
-            'baa': ['011']       # BAA state: ends with 011
+            'bb': ['11'],        # BB state: ends with 11
+            'aaa': ['000'],      # AAA state: ends with 000
+            'aaab': ['0001'],    # AAAB state: ends with 0001
+            'ba': ['10'],        # BA state: ends with 10
+            'bab': ['101'],      # BAB state: ends with 101
+            'baab': ['1001'],    # BAAB state: ends with 1001
+            'baa': ['100']       # BAA state: ends with 100
         }
     elif preset == 'golden_mean':
         return {
